@@ -18,7 +18,7 @@ def main():
     not_imp_last_day = 0
 
     df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
-                       ['', '', 'количество', 'цена руб', '', *positions, '', 'кол--во для расчёта финреза',
+                       ['', '', 'количество', 'цена руб', '', *positions, '', 'кол-во для расчёта финреза',
                         'цена ФИФО',
                         'реал', *eod_price, 'накопл накопл', 'реал финрез', 'нереал финрез', 'нереализ дневной']])
 
@@ -119,9 +119,10 @@ def get_fifo(fin_res, name, amount, price, queues):
                 if abs(amount) >= sum_amount + abs(e[0]):
                     fifo += abs(e[0]) * e[1]
                 else:
-                    fifo += (abs(amount) - sum_amount) * e[1]
+                    if abs(amount) > abs(sum_amount):
+                        fifo += (abs(amount) - sum_amount) * e[1]
                 sum_amount += abs(e[0])
-            fifo /= fin_res
+            fifo /= abs(fin_res)
         else:
             fifo = queues[name][0][1]
         fifo = round(fifo, 9)
