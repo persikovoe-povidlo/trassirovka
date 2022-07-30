@@ -7,7 +7,8 @@ def main():
     operations_per_day = {'from': 0, 'to': 5}
     date = '2022-01-01'
     positions = {'RUB': 0, 'Suek': 0, 'USD': 0, 'AAPL': 0}
-    eod_price = {'Suek': 0, 'USD': 0, 'AAPL': 0}
+    eod_price = dict(positions)
+    eod_price.pop('RUB')
     df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
                        ['', '', 'количество', 'цена руб', '', *positions, '', 'кол--во для расчёта финреза',
                         'цена ФИФО',
