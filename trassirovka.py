@@ -3,10 +3,12 @@ import pandas as pd
 
 def main():
     positions = ['RUB', 'Suek', 'USD', 'AAPL']
+    file = 'trassirovka_generated.xlsx'
+    sheet = '1'
     n = 9 + len(positions)
     eod_cols = [i + n for i in range(len(positions) - 1)]
     x = pd.concat(
-        [pd.read_excel('trassirovka_generated_.xlsx', sheet_name='1', usecols=[0, 1, 2, 3, *eod_cols], header=None),
+        [pd.read_excel(file, sheet_name=sheet, usecols=[0, 1, 2, 3, *eod_cols], header=None),
          pd.DataFrame([[]])], ignore_index=True)
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
@@ -15,7 +17,7 @@ def main():
     imp_sum = 0
     not_imp_last_day = 0
 
-    df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', '', '', '', 'цена на конец дня'],
+    df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
                        ['', '', 'количество', 'цена руб', '', *positions, '', 'кол--во для расчёта финреза',
                         'цена ФИФО',
                         'реал', *eod_price, 'накопл накопл', 'реал финрез', 'нереал финрез', 'нереализ дневной']])
@@ -53,8 +55,10 @@ def main():
         imp_stock = get_implemented(stock_fin_res, stock_fifo, stock_price)
         imp_cur = get_implemented(currency_fin_res, currency_fifo, currency_price)
         if imp_stock:
+            imp_stock = round(imp_stock, 9)
             imp_sum += imp_stock
         if imp_cur:
+            imp_cur = round(imp_cur, 9)
             imp_sum += imp_cur
 
         if date != next_date:
@@ -108,13 +112,19 @@ def get_fin_res(name, amount, positions):
 def get_fifo(fin_res, name, amount, price, queues):
     fifo = None
     if fin_res:
-        if len(queues[name]) > 1:
-            fifo = 0
+        fifo = 0
+        sum_amount = 0
+        if abs(queues[name][0][0]) < abs(amount):
             for e in queues[name]:
-                fifo += abs(e[0]) * e[1]
+                if abs(amount) >= sum_amount + abs(e[0]):
+                    fifo += abs(e[0]) * e[1]
+                else:
+                    fifo += (abs(amount) - sum_amount) * e[1]
+                sum_amount += abs(e[0])
             fifo /= fin_res
         else:
             fifo = queues[name][0][1]
+        fifo = round(fifo, 9)
 
     if queues[name]:
         if queues[name][0][0] * amount <= 0:
