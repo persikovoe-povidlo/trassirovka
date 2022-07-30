@@ -3,7 +3,8 @@ import random as r
 
 
 def main():
-    n = 6
+    days = 6
+    operations_per_day = {'from': 0, 'to': 5}
     date = '2022-01-01'
     positions = {'RUB': 0, 'Suek': 0, 'USD': 0, 'AAPL': 0}
     eod_price = {'Suek': 0, 'USD': 0, 'AAPL': 0}
@@ -11,8 +12,8 @@ def main():
                        ['', '', 'количество', 'цена руб', '', *positions, '', 'кол--во для расчёта финреза',
                         'цена ФИФО',
                         'реал', *eod_price, 'накопл накопл', 'реал финрез', 'нереал финрез', 'нереализ дневной']])
-    for i in range(n):
-        m = r.randint(1, 1)
+    for i in range(days):
+        m = r.randint(operations_per_day['from'], operations_per_day['to'])
         eod_price = {'Suek': r.randint(9, 11),
                      'AAPL': r.randint(20, 25),
                      'USD': r.randint(45, 55)}
@@ -27,11 +28,11 @@ def main():
 
             currency_price = 0
             currency_name = r.choice(['USD', 'RUB'])
-            currency_amount = r.randint(1, 30) * 10 * r.choice([-1, 1])
             if currency_name == 'USD':
                 currency_price = r.randint(45, 55)
             elif currency_name == 'RUB':
                 currency_price = 1
+            currency_amount = stock_amount * stock_price / currency_price
 
             new_part = pd.DataFrame([[date, stock_name, stock_amount, stock_price],
                                      [date, currency_name, currency_amount, currency_price], ])
