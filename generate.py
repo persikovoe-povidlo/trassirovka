@@ -7,12 +7,12 @@ def main():
     date = '2022-01-01'
     positions = {'RUB': 0, 'Suek': 0, 'USD': 0, 'AAPL': 0}
     eod_price = {'Suek': 0, 'USD': 0, 'AAPL': 0}
-    df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', '', '', '', 'цена на конец дня'],
+    df = pd.DataFrame([['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
                        ['', '', 'количество', 'цена руб', '', *positions, '', 'кол--во для расчёта финреза',
                         'цена ФИФО',
                         'реал', *eod_price, 'накопл накопл', 'реал финрез', 'нереал финрез', 'нереализ дневной']])
     for i in range(n):
-        m = r.randint(1,1)
+        m = r.randint(1, 1)
         eod_price = {'Suek': r.randint(9, 11),
                      'AAPL': r.randint(20, 25),
                      'USD': r.randint(45, 55)}
