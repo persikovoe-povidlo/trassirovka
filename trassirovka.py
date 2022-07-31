@@ -2,13 +2,13 @@ import pandas as pd
 
 
 def main():
-    positions = ['RUB', 'Suek', 'USD', 'AAPL']
-    file = 'trassirovka_generated.xlsx'
-    sheet = '1'
+    positions = ['RUB', 'Suek', 'USD']
+    file = 'Trassirovka-1.xlsx'
+    sheet = 'три инструмента'
     n = 9 + len(positions)
     eod_cols = [i + n for i in range(len(positions) - 1)]
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=sheet, usecols=[0, 1, 2, 3, *eod_cols], header=None),
+        [pd.read_excel(file, sheet_name=sheet, usecols=[0, 1, 2, 3, 4, *eod_cols], header=None),
          pd.DataFrame([[]])], ignore_index=True)
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
@@ -31,6 +31,7 @@ def main():
         currency_amount = round(x[2][i + 1], 9)
         currency_price = round(x[3][i + 1], 9)
         date = str(x[0][i]).split()[0]
+        aci = round(x[4][i], 9)
         j = n
         for e in eod_price:
             eod_price[e] = x[j][i + 2]
@@ -44,16 +45,16 @@ def main():
         positions[stock_name] += stock_amount
         positions[currency_name] += currency_amount
 
-        stock_fifo = get_fifo(stock_fin_res, stock_name, stock_amount, stock_price, queues)
-        currency_fifo = get_fifo(currency_fin_res, currency_name, currency_amount, currency_price, queues)
+        stock_fifo = get_fifo(stock_fin_res, stock_name, stock_amount, stock_price, queues, aci)
+        currency_fifo = get_fifo(currency_fin_res, currency_name, currency_amount, currency_price, queues, 0)
 
         if stock_fin_res:
             stock_fin_res = round(stock_fin_res, 9)
         if currency_fin_res:
             currency_fin_res = round(currency_fin_res, 9)
 
-        imp_stock = get_implemented(stock_fin_res, stock_fifo, stock_price)
-        imp_cur = get_implemented(currency_fin_res, currency_fifo, currency_price)
+        imp_stock = get_implemented(stock_fin_res, stock_fifo, stock_price, aci)
+        imp_cur = get_implemented(currency_fin_res, currency_fifo, currency_price, 0)
         if imp_stock:
             imp_stock = round(imp_stock, 9)
             imp_sum += imp_stock
@@ -93,9 +94,9 @@ def main():
     df.to_excel('out.xlsx', sheet_name='out', index=False, header=False)
 
 
-def get_implemented(fin_res, fifo, price):
+def get_implemented(fin_res, fifo, price, aci):
     if fin_res:
-        return fin_res * (fifo - price)
+        return fin_res * (fifo - price - aci)
 
 
 def get_fin_res(name, amount, positions):
@@ -109,7 +110,7 @@ def get_fin_res(name, amount, positions):
     return fin_res
 
 
-def get_fifo(fin_res, name, amount, price, queues):
+def get_fifo(fin_res, name, amount, price, queues, aci):
     fifo = None
     if fin_res:
         fifo = 0
@@ -117,29 +118,29 @@ def get_fifo(fin_res, name, amount, price, queues):
         if abs(queues[name][0][0]) < abs(amount):
             for e in queues[name]:
                 if abs(amount) >= sum_amount + abs(e[0]):
-                    fifo += abs(e[0]) * e[1]
+                    fifo += abs(e[0]) * (e[2] + e[1])
                 else:
                     if abs(amount) > abs(sum_amount):
-                        fifo += (abs(amount) - sum_amount) * e[1]
+                        fifo += (abs(amount) - sum_amount) * (e[2] + e[1])
                 sum_amount += abs(e[0])
             fifo /= abs(fin_res)
         else:
-            fifo = queues[name][0][1]
+            fifo = queues[name][0][1] + queues[name][0][2]
         fifo = round(fifo, 9)
 
     if queues[name]:
         if queues[name][0][0] * amount <= 0:
-            queues[name].insert(0, [amount, price])
+            queues[name].insert(0, [amount, price, aci])
             while len(queues[name]) > 1:
                 if abs(queues[name][0][0]) < abs(queues[name][1][0]):
-                    queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][1][1]]
+                    queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][1][1], queues[name][1][2]]
                 else:
-                    queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][0][1]]
+                    queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][0][1], queues[name][0][2]]
                 queues[name].pop(1)
         else:
-            queues[name].append([amount, price])
+            queues[name].append([amount, price, aci])
     else:
-        queues[name].append([amount, price])
+        queues[name].append([amount, price, aci])
     return fifo
 
 
