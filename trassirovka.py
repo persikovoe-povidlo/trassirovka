@@ -2,9 +2,9 @@ import pandas as pd
 
 
 def main():
-    positions = ['RUB', 'Suek', 'USD']
-    file = 'Trassirovka-1.xlsx'
-    sheet = 'три инструмента'
+    positions = ['RUB', 'Suek', 'USD', 'AAPL']
+    file = 'trassirovka_generated.xlsx'
+    sheet = '1'
     n = 9 + len(positions)
     eod_cols = [i + n for i in range(len(positions) - 1)]
     x = pd.concat(
@@ -44,6 +44,9 @@ def main():
 
         positions[stock_name] += stock_amount
         positions[currency_name] += currency_amount
+
+        if str(aci) == 'nan':
+            aci = 0
 
         stock_fifo = get_fifo(stock_fin_res, stock_name, stock_amount, stock_price, queues, aci)
         currency_fifo = get_fifo(currency_fin_res, currency_name, currency_amount, currency_price, queues, 0)
