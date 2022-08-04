@@ -25,7 +25,7 @@ def main():
     for i in range(2, x[0].size - 1, 3):
 
         stock_name = str(x[1][i])
-        stock_amount = round(x[2][i], 9)
+        stock_amount = round(x[2][i], 9) # <= why do you round ?
         stock_price = round(x[3][i], 9)
         currency_name = str(x[1][i + 1])
         currency_amount = round(x[2][i + 1], 9)
@@ -33,7 +33,7 @@ def main():
         date = str(x[0][i]).split()[0]
         aci = round(x[4][i], 9)
         j = n
-        for e in eod_price:
+        for e in eod_price: # <= AAPL price is wrong 
             eod_price[e] = x[j][i + 2]
             j += 1
 
@@ -46,7 +46,7 @@ def main():
         positions[currency_name] += currency_amount
 
         if str(aci) == 'nan':
-            aci = 0
+            aci = 0 # <= never entered
 
         stock_fifo = get_fifo(stock_fin_res, stock_name, stock_amount, stock_price, queues, aci)
         currency_fifo = get_fifo(currency_fin_res, currency_name, currency_amount, currency_price, queues, 0)
@@ -56,8 +56,8 @@ def main():
         if currency_fin_res:
             currency_fin_res = round(currency_fin_res, 9)
 
-        imp_stock = get_implemented(stock_fin_res, stock_fifo, stock_price, aci)
-        imp_cur = get_implemented(currency_fin_res, currency_fifo, currency_price, 0)
+        imp_stock = get_implemented(stock_fin_res, stock_fifo, stock_price, aci) # <= rename to realized_stock
+        imp_cur = get_implemented(currency_fin_res, currency_fifo, currency_price, 0) # <= rename to realized_cur
         if imp_stock:
             imp_stock = round(imp_stock, 9)
             imp_sum += imp_stock
@@ -84,7 +84,7 @@ def main():
                  ['', '', '', '', '', *[positions[e] for e in positions], '', '', '', '',
                   *[eod_price[e] for e in eod_price], acc_fin_res, imp_sum, not_imp, not_imp_day]])
             df = pd.concat([df, new_df])
-        else:
+        else: # <= never entered, update the xls table to test this branch
             new_df = pd.DataFrame(
                 [[date, stock_name, stock_amount, stock_price, '', '', *list(' ' * len(positions)), stock_fin_res,
                   stock_fifo,
@@ -97,20 +97,20 @@ def main():
     df.to_excel('out.xlsx', sheet_name='out', index=False, header=False)
 
 
-def get_implemented(fin_res, fifo, price, aci):
+def get_implemented(fin_res, fifo, price, aci): # <= rename to get_realized
     if fin_res:
         return fin_res * (fifo - price - aci)
 
 
-def get_fin_res(name, amount, positions):
-    if name != 'RUB' and abs(positions[name] + amount) < abs(positions[name]):
+def get_fin_res(name, amount, positions): # <= rename to get_fifo_amount
+    if name != 'RUB' and abs(positions[name] + amount) < abs(positions[name]): # <= try positions[name] of 10, amount of -30. fin_res shoud be 10. Update xls file to test it
         if abs(positions[name]) >= abs(amount):
             fin_res = amount
         else:
             fin_res = -positions[name]
     else:
         fin_res = None
-    return fin_res
+    return fin_res # <= rename to fifo_amount
 
 
 def get_fifo(fin_res, name, amount, price, queues, aci):
@@ -118,29 +118,29 @@ def get_fifo(fin_res, name, amount, price, queues, aci):
     if fin_res:
         fifo = 0
         sum_amount = 0
-        if abs(queues[name][0][0]) < abs(amount):
+        if abs(queues[name][0][0]) < abs(amount): # traversing queue needed
             for e in queues[name]:
                 if abs(amount) >= sum_amount + abs(e[0]):
                     fifo += abs(e[0]) * (e[2] + e[1])
-                else:
+                else: # <= never entered, update xls to test
                     if abs(amount) > abs(sum_amount):
                         fifo += (abs(amount) - sum_amount) * (e[2] + e[1])
                 sum_amount += abs(e[0])
             fifo /= abs(fin_res)
-        else:
+        else: # fifo price can be obtained from the first record, no traverse needed
             fifo = queues[name][0][1] + queues[name][0][2]
         fifo = round(fifo, 9)
 
     if queues[name]:
-        if queues[name][0][0] * amount <= 0:
+        if queues[name][0][0] * amount <= 0: # pop from queue
             queues[name].insert(0, [amount, price, aci])
             while len(queues[name]) > 1:
-                if abs(queues[name][0][0]) < abs(queues[name][1][0]):
+                if abs(queues[name][0][0]) < abs(queues[name][1][0]): # a portion of a queue item is poped
                     queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][1][1], queues[name][1][2]]
-                else:
+                else: # the whole queue item is poped
                     queues[name][0] = [queues[name][0][0] + queues[name][1][0], queues[name][0][1], queues[name][0][2]]
                 queues[name].pop(1)
-        else:
+        else: # push to queue
             queues[name].append([amount, price, aci])
     else:
         queues[name].append([amount, price, aci])
