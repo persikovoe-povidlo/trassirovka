@@ -1,0 +1,5 @@
+*.xlsx
+.idea/
+__pycache__/
+*.xls
+venv/
