@@ -14,15 +14,15 @@ def main():
     print('reading file...')
 
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=sheet, usecols=[8, 11, 12, 13, 20, 21, 23, 25, 29, 43, 55], header=None),
+        [pd.read_excel(file, sheet_name=sheet, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 29, 43, 44, 55], header=None),
          pd.DataFrame([[]])], ignore_index=True)
-    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=sheet, usecols=[0, 8, 24], header=None)
+    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=sheet, usecols=[0, 8, 17], header=None)
     eod_price_dict = {}
     for i in range(1, eod_price_list[0].size):
         date = str(eod_price_list[0][i]).split()[0]
         if date not in eod_price_dict:
             eod_price_dict[date] = {}
-        eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[24][i]
+        eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[17][i]
 
     stock_positions = x[8].values.tolist()
     cur_positions = x[25].values.tolist()
@@ -38,6 +38,7 @@ def main():
     eod_price = dict(positions)
     imp_sum = 0
     not_imp_last_day = 0
+    repos = {}
 
     df = pd.DataFrame()
 
@@ -53,35 +54,49 @@ def main():
         currency_name = str(x[25][i])
         currency_amount = round(x[21][i] * stock_amount, 9)
         if x[12][i] in ['Еврооблигации', 'Облигиция', 'ОФЗ']:
-            stock_price_rub = stock_price_rub * x[11][i] / 100
-            currency_amount = currency_amount * x[11][i] / 100
+            denomination = x[11][i] / 100
+            stock_price_rub = stock_price_rub * denomination
+            currency_amount = currency_amount * denomination
 
         date = str(x[13][i]).split()[0]
         next_date = str(x[13][i + 1]).split()[0]
 
         aci = round(x[23][i], 9)
 
-        if str(x[43][i]) == 'nan':
-            repo = False
-        else:
-            repo = True
+        repo_cell = str(x[43][i])
 
-        stock_fifo_amount = get_fifo_amount(stock_name, stock_amount, positions, repo)
-        currency_fifo_amount = get_fifo_amount(currency_name, currency_amount, positions, repo)
+        if repo_cell == 'РЕПО 1 часть':
+            repos[x[3][i]] = currency_amount
+            realized_stock = None
+            realized_cur = None
+            stock_fifo_amount = None
+            currency_fifo_amount = None
+            stock_fifo = None
+            currency_fifo = None
+        elif repo_cell == 'РЕПО 2 часть':
+            realized_stock = currency_amount + repos[x[44][i]]
+            realized_cur = None
+            stock_fifo_amount = None
+            currency_fifo_amount = None
+            stock_fifo = None
+            currency_fifo = None
+        else:
+            stock_fifo_amount = get_fifo_amount(stock_name, stock_amount, positions)
+            currency_fifo_amount = get_fifo_amount(currency_name, currency_amount, positions)
+            stock_fifo = get_fifo(stock_fifo_amount, stock_name, stock_amount, stock_price_rub, queues, aci)
+            currency_fifo = get_fifo(currency_fifo_amount, currency_name, currency_amount, currency_price_rub, queues,
+                                     0)
+            realized_stock = get_realized(stock_fifo_amount, stock_fifo, stock_price_rub, aci)
+            realized_cur = get_realized(currency_fifo_amount, currency_fifo, currency_price_rub, 0)
 
         positions[stock_name] += stock_amount
         positions[currency_name] += currency_amount
-
-        stock_fifo = get_fifo(stock_fifo_amount, stock_name, stock_amount, stock_price_rub, queues, aci)
-        currency_fifo = get_fifo(currency_fifo_amount, currency_name, currency_amount, currency_price_rub, queues, 0)
 
         if stock_fifo_amount:
             stock_fifo_amount = round(stock_fifo_amount, 9)
         if currency_fifo_amount:
             currency_fifo_amount = round(currency_fifo_amount, 9)
 
-        realized_stock = get_realized(stock_fifo_amount, stock_fifo, stock_price_rub, aci)
-        realized_cur = get_realized(currency_fifo_amount, currency_fifo, currency_price_rub, 0)
         if realized_stock:
             realized_stock = round(realized_stock, 9)
             imp_sum += realized_stock
@@ -97,28 +112,27 @@ def main():
                 acc_fifo_amount += positions[e] * eod_price[e]
             acc_fifo_amount = round(acc_fifo_amount, 9)
             not_imp = acc_fifo_amount - imp_sum
-
             not_imp_day = not_imp - not_imp_last_day
             not_imp_last_day = not_imp
             new_df = pd.DataFrame(
-                [[date, stock_name, stock_amount, stock_price_rub, '', '', *list(' ' * len(positions)),
+                [[date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
                   stock_fifo_amount, stock_fifo, realized_stock],
-                 [date, currency_name, currency_amount, currency_price_rub, '', '', *list(' ' * len(positions)),
+                 [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
                   currency_fifo_amount, currency_fifo, realized_cur],
                  ['', '', '', '', '', *[positions[e] for e in positions], '', '', '', '',
                   *[eod_price[e] for e in eod_price], acc_fifo_amount, imp_sum, not_imp, not_imp_day]])
             df = pd.concat([df, new_df])
         else:
             new_df = pd.DataFrame(
-                [[date, stock_name, stock_amount, stock_price_rub, '', '', *list(' ' * len(positions)),
+                [[date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
                   stock_fifo_amount, stock_fifo, realized_stock, ],
-                 [date, currency_name, currency_amount, currency_price_rub, '', '', *list(' ' * len(positions)),
+                 [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
                   currency_fifo_amount, currency_fifo, realized_cur],
                  ['', '', '', '', '', *[positions[e] for e in positions]]])
             df = pd.concat([df, new_df])
     cols_df = pd.DataFrame(
         [['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
-         ['', '', 'количество', 'цена руб', '', *positions, '', 'кол-во для расчёта финреза', 'цена ФИФО',
+         ['', '', 'количество', 'цена руб', 'нкд', *positions, '', 'кол-во для расчёта финреза', 'цена ФИФО',
           'реал', *eod_price, 'накопл финрез', 'реал накопл', 'нереал накопл', 'нереализ дневной']])
     df = pd.concat([cols_df, df])
 
@@ -137,14 +151,14 @@ def get_realized(fifo_amount, fifo, price, aci):
         return fifo_amount * (fifo - price - aci)
 
 
-def get_fifo_amount(name, amount, positions, repo):
-    if name != 'РУБ' and abs(positions[name] + amount) < abs(positions[name]) and not repo:
-        if abs(positions[name]) >= abs(amount):
+def get_fifo_amount(name, amount, positions):
+    fifo_amount = None
+    if positions[name] * (positions[name] + amount) > 0:
+        if name != 'РУБ' and abs(positions[name] + amount) < abs(positions[name]):
             fifo_amount = amount
-        else:
-            fifo_amount = -positions[name]
     else:
-        fifo_amount = None
+        if positions[name] and name != 'РУБ':
+            fifo_amount = -positions[name]
     return fifo_amount
 
 
