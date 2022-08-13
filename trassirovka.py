@@ -75,7 +75,13 @@ def main():
     start_time = time.time()
     print('main script running...')
 
-    for i in range(x[8].size - 1):
+    n = x[8].size - 1
+    k = 1
+
+    for i in range(n):
+        if i >= n / 10 * k:
+            print('{} % done'.format(k*10))
+            k += 1
         stock_name = str(x[8][i])
         stock_amount = x[20][i]
         currency_price_rub = round(x[55][i], 9)
@@ -165,6 +171,7 @@ def main():
           'реал', *eod_price, 'накопл финрез', 'реал накопл', 'нереал накопл', 'нереализ дневной']])
     df = pd.concat([cols_df, df])
 
+    print('{} % done'.format(k*10))
     print("%s seconds" % round(time.time() - start_time, 2))
     start_time = time.time()
     print('writing to file...')
@@ -172,6 +179,7 @@ def main():
     df.to_excel('out.xlsx', sheet_name='out', index=False, header=False)
 
     print("%s seconds" % round(time.time() - start_time, 2))
+    print('--------------------')
     print("%s seconds total" % round(time.time() - total_time, 2))
 
 
