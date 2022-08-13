@@ -7,15 +7,17 @@ def main():
 
     file = 'Сделки_01072022-03082022_03-08-2022_174758.xlsx'
     eod_prices_file = 'Pozitsii_Po_Tsb_01072022-04082022_04-08-2022_155347.xlsx'
+    leftovers_file = 'Pozitsii_Po_Tsb_30062022-30062022_09-08-2022_103732.xlsx'
     sheet = '1'
+    needed_date = '2022-06-30'
     positions = []
 
     start_time = time.time()
-    print('reading file...')
+    print('reading files...')
 
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=sheet, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 29, 43, 44, 55], header=None),
-         pd.DataFrame([[]])], ignore_index=True)
+        [pd.read_excel(file, sheet_name=sheet, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 43, 44, 55], header=None),
+         pd.DataFrame([[]])], ignore_index=True).drop([0])
     eod_price_list = pd.read_excel(eod_prices_file, sheet_name=sheet, usecols=[0, 8, 17], header=None)
     eod_price_dict = {}
     for i in range(1, eod_price_list[0].size):
@@ -35,6 +37,33 @@ def main():
             positions.append(e)
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
+
+    leftovers_list = pd.read_excel(leftovers_file, sheet_name=sheet, usecols=[0, 8, 11, 13, 17, 21, 26, 28, 29],
+                                   header=None)
+
+    leftovers_df = pd.DataFrame()
+    for i in range(leftovers_list[0].size):
+        date = str(leftovers_list[0][i]).split()[0]
+        stock_name = leftovers_list[8][i]
+        stock_amount = leftovers_list[13][i]
+        if date == needed_date and stock_name in positions.keys() and stock_amount:
+            stock_type = leftovers_list[11][i]
+            stock_price = leftovers_list[17][i]
+            currency_name = leftovers_list[21][i]
+            aci = leftovers_list[26][i]
+            currency_price_rub = round(leftovers_list[28][i] / stock_price / stock_amount, 9)
+            denomination = leftovers_list[29][i]
+            new_df = pd.DataFrame(
+                [['', '', '', '', '', '', '', '', stock_name, '', '', denomination, stock_type, date, '', '', '',
+                  '', '', '', stock_amount, stock_price, '', aci, '', currency_name, '', '', '', '', '', '', '', '',
+                  '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+                  currency_price_rub]])
+            leftovers_df = pd.concat([leftovers_df, new_df])
+            if date not in eod_price_dict:
+                eod_price_dict[date] = {}
+            eod_price_dict[date][stock_name] = stock_price
+    x = pd.concat([leftovers_df, x], ignore_index=True)
+
     eod_price = dict(positions)
     imp_sum = 0
     not_imp_last_day = 0
@@ -46,7 +75,7 @@ def main():
     start_time = time.time()
     print('main script running...')
 
-    for i in range(1, x[8].size - 1):
+    for i in range(x[8].size - 1):
         stock_name = str(x[8][i])
         stock_amount = x[20][i]
         currency_price_rub = round(x[55][i], 9)
