@@ -1,14 +1,14 @@
 import pandas as pd
 import time
+from pyexcelerate import Workbook
 
 
 def main():
     total_time = time.time()
 
-    file = 'Сделки_01072022-03082022_03-08-2022_174758.xlsx'
-    eod_prices_file = 'Pozitsii_Po_Tsb_01072022-04082022_04-08-2022_155347.xlsx'
-    leftovers_file = 'Pozitsii_Po_Tsb_30062022-30062022_09-08-2022_103732.xlsx'
-    sheet = '1'
+    file = 'Сделки_01072022-03082022_03-08-2022_174758.xls'
+    eod_prices_file = 'Pozitsii_Po_Tsb_01072022-04082022_04-08-2022_155347.xls'
+    leftovers_file = 'Pozitsii_Po_Tsb_30062022-30062022_09-08-2022_103732.xls'
     needed_date = '2022-06-30'
     positions = []
 
@@ -16,9 +16,11 @@ def main():
     print('reading files...')
 
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=sheet, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 43, 44, 55], header=None),
+        [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 43, 44, 55], header=None),
          pd.DataFrame([[]])], ignore_index=True).drop([0])
-    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=sheet, usecols=[0, 8, 17], header=None)
+    x[13] = pd.to_datetime(x[13])
+    x = x.sort_values(by=[13, 43])
+    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=0, usecols=[0, 8, 17], header=None)
     eod_price_dict = {}
     for i in range(1, eod_price_list[0].size):
         date = str(eod_price_list[0][i]).split()[0]
@@ -38,7 +40,7 @@ def main():
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
 
-    leftovers_list = pd.read_excel(leftovers_file, sheet_name=sheet, usecols=[0, 8, 11, 13, 17, 21, 26, 28, 29],
+    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 11, 13, 17, 21, 26, 28, 29],
                                    header=None)
 
     leftovers_df = pd.DataFrame()
@@ -69,7 +71,9 @@ def main():
     not_imp_last_day = 0
     repos = {}
 
-    df = pd.DataFrame()
+    table = [['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
+             ['', '', 'количество', 'цена руб', 'нкд', *positions, '', 'кол-во для расчёта финреза', 'цена ФИФО',
+              'реал', *eod_price, 'накопл финрез', 'реал накопл', 'нереал накопл', 'нереализ дневной']]
 
     print("%s seconds" % round(time.time() - start_time, 2))
     start_time = time.time()
@@ -80,7 +84,7 @@ def main():
 
     for i in range(n):
         if i >= n / 10 * k:
-            print('{} % done'.format(k*10))
+            print('{} % done'.format(k * 10))
             k += 1
         stock_name = str(x[8][i])
         stock_amount = x[20][i]
@@ -149,34 +153,28 @@ def main():
             not_imp = acc_fifo_amount - imp_sum
             not_imp_day = not_imp - not_imp_last_day
             not_imp_last_day = not_imp
-            new_df = pd.DataFrame(
-                [[date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
-                  stock_fifo_amount, stock_fifo, realized_stock],
-                 [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
-                  currency_fifo_amount, currency_fifo, realized_cur],
-                 ['', '', '', '', '', *[positions[e] for e in positions], '', '', '', '',
-                  *[eod_price[e] for e in eod_price], acc_fifo_amount, imp_sum, not_imp, not_imp_day]])
-            df = pd.concat([df, new_df])
+            table.append([date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
+                          stock_fifo_amount, stock_fifo, realized_stock])
+            table.append(
+                [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
+                 currency_fifo_amount, currency_fifo, realized_cur])
+            table.append(['', '', '', '', '', *[positions[e] for e in positions], '', '', '', '',
+                          *[eod_price[e] for e in eod_price], acc_fifo_amount, imp_sum, not_imp, not_imp_day])
         else:
-            new_df = pd.DataFrame(
-                [[date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
-                  stock_fifo_amount, stock_fifo, realized_stock, ],
-                 [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
-                  currency_fifo_amount, currency_fifo, realized_cur],
-                 ['', '', '', '', '', *[positions[e] for e in positions]]])
-            df = pd.concat([df, new_df])
-    cols_df = pd.DataFrame(
-        [['', '', '', '', '', 'позиции', '', '', '', *list(' ' * len(positions)), 'цена на конец дня'],
-         ['', '', 'количество', 'цена руб', 'нкд', *positions, '', 'кол-во для расчёта финреза', 'цена ФИФО',
-          'реал', *eod_price, 'накопл финрез', 'реал накопл', 'нереал накопл', 'нереализ дневной']])
-    df = pd.concat([cols_df, df])
+            table.append([date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
+                          stock_fifo_amount, stock_fifo, realized_stock, ])
+            table.append([date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
+                          stock_fifo_amount, stock_fifo, realized_stock, ])
+            table.append(['', '', '', '', '', *[positions[e] for e in positions]])
+    df = pd.DataFrame(table)
 
-    print('{} % done'.format(k*10))
+    print('{} % done'.format(k * 10))
     print("%s seconds" % round(time.time() - start_time, 2))
     start_time = time.time()
     print('writing to file...')
 
-    df.to_excel('out.xlsx', sheet_name='out', index=False, header=False)
+    save_to_csv(df, 'out.csv')
+    # save_to_xlsx(df, 'out.xlsx')
 
     print("%s seconds" % round(time.time() - start_time, 2))
     print('--------------------')
@@ -230,6 +228,17 @@ def get_fifo(fifo_amount, name, amount, price, queues, aci):
     else:
         queues[name].append([amount, price, aci])
     return fifo
+
+
+def save_to_csv(df, filename):
+    df.to_csv(filename, index=False, header=False, encoding='utf-8-sig')
+
+
+def save_to_xlsx(df, filename, sheetname='1'):
+    values = [df.columns] + list(df.values)
+    wb = Workbook()
+    wb.new_sheet(sheetname, data=values)
+    wb.save(filename)
 
 
 if __name__ == '__main__':
