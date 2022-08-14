@@ -91,7 +91,7 @@ def main():
         currency_price_rub = round(x[55][i], 9)
         stock_price_rub = x[21][i] * currency_price_rub
         currency_name = str(x[25][i])
-        currency_amount = round(x[21][i] * stock_amount, 9)
+        currency_amount = round(x[21][i] * -stock_amount, 9)
         if x[12][i] in ['Еврооблигации', 'Облигиция', 'ОФЗ']:
             denomination = x[11][i] / 100
             stock_price_rub = stock_price_rub * denomination
@@ -147,7 +147,7 @@ def main():
             acc_fifo_amount = positions['РУБ']
             for e in eod_price:
                 if e in eod_price_dict[date]:
-                    eod_price[e] = eod_price_dict[date][e]
+                    eod_price[e] = eod_price_dict[date][e]*currency_price_rub
                 acc_fifo_amount += positions[e] * eod_price[e]
             acc_fifo_amount = round(acc_fifo_amount, 9)
             not_imp = acc_fifo_amount - imp_sum
@@ -163,8 +163,9 @@ def main():
         else:
             table.append([date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
                           stock_fifo_amount, stock_fifo, realized_stock, ])
-            table.append([date, stock_name, stock_amount, stock_price_rub, aci, '', *list(' ' * len(positions)),
-                          stock_fifo_amount, stock_fifo, realized_stock, ])
+            table.append(
+                [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
+                 currency_fifo_amount, currency_fifo, realized_cur])
             table.append(['', '', '', '', '', *[positions[e] for e in positions]])
     df = pd.DataFrame(table)
 
