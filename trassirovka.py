@@ -1,5 +1,6 @@
 import pandas as pd
 import time
+import datetime
 from pyexcelerate import Workbook
 
 
@@ -9,7 +10,8 @@ def main():
     file = 'Сделки_01072022-03082022_03-08-2022_174758.xls'
     eod_prices_file = 'Pozitsii_Po_Tsb_01072022-04082022_04-08-2022_155347.xls'
     leftovers_file = 'Pozitsii_Po_Tsb_30062022-30062022_09-08-2022_103732.xls'
-    needed_date = '2022-06-30'
+    exch_rates_usd_file = 'usd.xlsx'
+    exch_rates_cny_file = 'cny.xlsx'
     positions = []
 
     start_time = time.time()
@@ -19,14 +21,26 @@ def main():
         [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 43, 44, 55], header=None),
          pd.DataFrame([[]])], ignore_index=True).drop([0])
     x[13] = pd.to_datetime(x[13])
-    x = x.sort_values(by=[13, 43])
-    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=0, usecols=[0, 8, 17], header=None)
+    x = x.sort_values(by=[13, 43], ignore_index=True)
+
+    needed_date = str(x[13][1] - datetime.timedelta(days=1)).split()[0]
+
+    exch_rates_usd = pd.read_excel(exch_rates_usd_file, sheet_name=0, usecols=[1, 2], header=0)
+    usd_prices = exch_rates_usd.to_dict('records')
+
+    exch_rates_cny = pd.read_excel(exch_rates_cny_file, sheet_name=0, usecols=[0, 1, 2], header=0)
+    cny_prices = exch_rates_cny.to_dict('records')
+
+    eod_price_list = pd.read_excel(eod_prices_file, sheet_name=0, usecols=[0, 8, 13, 24], header=None)
     eod_price_dict = {}
     for i in range(1, eod_price_list[0].size):
         date = str(eod_price_list[0][i]).split()[0]
         if date not in eod_price_dict:
             eod_price_dict[date] = {}
-        eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[17][i]
+        amount = eod_price_list[13][i]
+        if amount:
+            eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[24][i] / eod_price_list[13][i]
+            eod_price_dict[date]['РУБ'] = 1
 
     stock_positions = x[8].values.tolist()
     cur_positions = x[25].values.tolist()
@@ -42,7 +56,6 @@ def main():
 
     leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 11, 13, 17, 21, 26, 28, 29],
                                    header=None)
-
     leftovers_df = pd.DataFrame()
     for i in range(leftovers_list[0].size):
         date = str(leftovers_list[0][i]).split()[0]
@@ -63,8 +76,19 @@ def main():
             leftovers_df = pd.concat([leftovers_df, new_df])
             if date not in eod_price_dict:
                 eod_price_dict[date] = {}
-            eod_price_dict[date][stock_name] = stock_price
+            eod_price_dict[date][stock_name] = stock_price * currency_price_rub
+            eod_price_dict[date]['РУБ'] = 1
     x = pd.concat([leftovers_df, x], ignore_index=True)
+
+    for row in usd_prices:
+        date = str(row['data']).split()[0]
+        if date in eod_price_dict.keys():
+            eod_price_dict[date]['USD'] = row['curs']
+
+    for row in cny_prices:
+        date = str(row['data']).split()[0]
+        if date in eod_price_dict.keys():
+            eod_price_dict[date]['CNY'] = row['curs'] / row['nominal']
 
     eod_price = dict(positions)
     imp_sum = 0
@@ -144,10 +168,11 @@ def main():
             imp_sum += realized_cur
 
         if date != next_date:
-            acc_fifo_amount = positions['РУБ']
+            # acc_fifo_amount = positions['РУБ']
+            acc_fifo_amount = 0
             for e in eod_price:
                 if e in eod_price_dict[date]:
-                    eod_price[e] = eod_price_dict[date][e]*currency_price_rub
+                    eod_price[e] = eod_price_dict[date][e]
                 acc_fifo_amount += positions[e] * eod_price[e]
             acc_fifo_amount = round(acc_fifo_amount, 9)
             not_imp = acc_fifo_amount - imp_sum
