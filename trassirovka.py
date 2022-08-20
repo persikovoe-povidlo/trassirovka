@@ -25,23 +25,8 @@ def main():
 
     needed_date = str(x[13][1] - datetime.timedelta(days=1)).split()[0]
 
-    exch_rates_usd = pd.read_excel(exch_rates_usd_file, sheet_name=0, usecols=[1, 2], header=0)
-    usd_prices = exch_rates_usd.to_dict('records')
-
-    exch_rates_cny = pd.read_excel(exch_rates_cny_file, sheet_name=0, usecols=[0, 1, 2], header=0)
-    cny_prices = exch_rates_cny.to_dict('records')
-
     eod_price_list = pd.read_excel(eod_prices_file, sheet_name=0, usecols=[0, 8, 13, 24], header=None)
     eod_price_dict = {}
-    for i in range(1, eod_price_list[0].size):
-        date = str(eod_price_list[0][i]).split()[0]
-        if date not in eod_price_dict:
-            eod_price_dict[date] = {}
-        amount = eod_price_list[13][i]
-        if amount:
-            eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[24][i] / eod_price_list[13][i]
-            eod_price_dict[date]['РУБ'] = 1
-
     stock_positions = x[8].values.tolist()
     cur_positions = x[25].values.tolist()
     stock_positions.pop(0)
@@ -79,6 +64,21 @@ def main():
             eod_price_dict[date][stock_name] = stock_price * currency_price_rub
             eod_price_dict[date]['РУБ'] = 1
     x = pd.concat([leftovers_df, x], ignore_index=True)
+
+    exch_rates_usd = pd.read_excel(exch_rates_usd_file, sheet_name=0, usecols=[1, 2], header=0)
+    usd_prices = exch_rates_usd.to_dict('records')
+
+    exch_rates_cny = pd.read_excel(exch_rates_cny_file, sheet_name=0, usecols=[0, 1, 2], header=0)
+    cny_prices = exch_rates_cny.to_dict('records')
+
+    for i in range(1, eod_price_list[0].size):
+        date = str(eod_price_list[0][i]).split()[0]
+        if date not in eod_price_dict:
+            eod_price_dict[date] = {}
+        amount = eod_price_list[13][i]
+        if amount:
+            eod_price_dict[date][eod_price_list[8][i]] = eod_price_list[24][i] / eod_price_list[13][i]
+            eod_price_dict[date]['РУБ'] = 1
 
     for row in usd_prices:
         date = str(row['data']).split()[0]
@@ -168,7 +168,6 @@ def main():
             imp_sum += realized_cur
 
         if date != next_date:
-            # acc_fifo_amount = positions['РУБ']
             acc_fifo_amount = 0
             for e in eod_price:
                 if e in eod_price_dict[date]:
