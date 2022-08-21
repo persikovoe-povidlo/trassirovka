@@ -124,7 +124,7 @@ def main():
         date = str(x[13][i]).split()[0]
         next_date = str(x[13][i + 1]).split()[0]
 
-        aci = round(x[23][i], 9)
+        aci = round(abs(x[23][i] / currency_amount), 9)
 
         repo_cell = str(x[43][i])
 
