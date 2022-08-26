@@ -4,6 +4,7 @@ import datetime
 from pyexcelerate import Workbook
 from download import download_cur
 import warnings
+from os.path import exists
 
 
 def main():
@@ -18,14 +19,20 @@ def main():
 
     start_time = time.time()
     print('reading files...')
+    if not exists('usd.xlsx'):
+        download_cur('01', '01', '2022', 'usd')
+        print('downloaded usd.xlsx')
+        download_cur('01', '01', '2022', 'cny')
+        print('downloaded cny.xlsx')
 
     with warnings.catch_warnings(record=True):
         warnings.simplefilter("always")
-        usd_df = pd.read_excel(exch_rates_usd_file, sheet_name=0, header=0)
-    if usd_df['data'][0].date() != datetime.date.today() - datetime.timedelta(days=1):
-        download_cur('usd')
+        usd_df = pd.read_excel(exch_rates_usd_file, sheet_name=0, header=0, engine="openpyxl")
+
+    if usd_df['data'][0].date() < datetime.date.today() - datetime.timedelta(days=1):
+        download_cur('01', '01', '2022', 'usd')
         print('downloaded usd.xlsx')
-        download_cur('cny')
+        download_cur('01', '01', '2022', 'cny')
         print('downloaded cny.xlsx')
 
     x = pd.concat(
@@ -78,12 +85,13 @@ def main():
 
     with warnings.catch_warnings(record=True):
         warnings.simplefilter("always")
-        exch_rates_usd = pd.read_excel(exch_rates_usd_file, sheet_name=0, usecols=[1, 2], header=0)
+        exch_rates_usd = pd.read_excel(exch_rates_usd_file, sheet_name=0, usecols=[1, 2], header=0, engine='openpyxl')
     usd_prices = exch_rates_usd.to_dict('records')
 
     with warnings.catch_warnings(record=True):
         warnings.simplefilter("always")
-        exch_rates_cny = pd.read_excel(exch_rates_cny_file, sheet_name=0, usecols=[0, 1, 2], header=0)
+        exch_rates_cny = pd.read_excel(exch_rates_cny_file, sheet_name=0, usecols=[0, 1, 2], header=0,
+                                       engine='openpyxl')
     cny_prices = exch_rates_cny.to_dict('records')
 
     for i in range(1, eod_price_list[0].size):
