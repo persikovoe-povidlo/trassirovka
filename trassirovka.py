@@ -36,7 +36,7 @@ def main():
         print('downloaded cny.xlsx')
 
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 11, 12, 13, 20, 21, 23, 25, 43, 44, 55], header=None),
+        [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 11, 12, 13, 20, 23, 25, 29, 30, 43, 44, 55], header=None),
          pd.DataFrame([[]])], ignore_index=True).drop([0])
     x[13] = pd.to_datetime(x[13])
     x = x.sort_values(by=[13, 43], ignore_index=True)
@@ -57,7 +57,7 @@ def main():
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
 
-    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 11, 13, 17, 21, 26, 28, 29],
+    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 11, 13, 17, 21, 24, 26, 28, 29],
                                    header=None)
     leftovers_df = pd.DataFrame()
     for i in range(leftovers_list[0].size):
@@ -65,21 +65,22 @@ def main():
         stock_name = leftovers_list[8][i]
         stock_amount = leftovers_list[13][i]
         if date == needed_date and stock_name in positions.keys() and stock_amount:
-            stock_type = leftovers_list[11][i]
+            total_stock_price = leftovers_list[24][i]
             stock_price = leftovers_list[17][i]
+            stock_price_rub = round(total_stock_price / abs(stock_amount), 9)
             currency_name = leftovers_list[21][i]
-            aci = leftovers_list[26][i]
-            currency_price_rub = round(leftovers_list[28][i] / stock_price / stock_amount, 9)
-            denomination = leftovers_list[29][i]
+            aci = round(leftovers_list[26][i] / abs(stock_amount), 9)
+            currency_price_rub = round(total_stock_price / stock_price / stock_amount, 9)
             new_df = pd.DataFrame(
-                [['', '', '', '', '', '', '', '', stock_name, '', '', denomination, stock_type, date, '', '', '',
-                  '', '', '', stock_amount, stock_price, '', aci, '', currency_name, '', '', '', '', '', '', '', '',
+                [['', '', '', '', '', '', '', '', stock_name, '', '', '', '', date, '', '', '',
+                  '', '', '', stock_amount, '', '', '', '', currency_name, '', '', '', -total_stock_price, -aci,
+                  '', '', '',
                   '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
                   currency_price_rub]])
             leftovers_df = pd.concat([leftovers_df, new_df])
             if date not in eod_price_dict:
                 eod_price_dict[date] = {}
-            eod_price_dict[date][stock_name] = stock_price * currency_price_rub
+            eod_price_dict[date][stock_name] = stock_price_rub
             eod_price_dict[date]['РУБ'] = 1
     x = pd.concat([leftovers_df, x], ignore_index=True)
 
@@ -136,18 +137,14 @@ def main():
         stock_name = str(x[8][i])
         stock_amount = x[20][i]
         currency_price_rub = round(x[55][i], 9)
-        stock_price_rub = x[21][i] * currency_price_rub
+        stock_price_rub = x[29][i] / -stock_amount
         currency_name = str(x[25][i])
-        currency_amount = round(x[21][i] * -stock_amount, 9)
-        if x[12][i] in ['Еврооблигации', 'Облигиция', 'ОФЗ']:
-            denomination = x[11][i] / 100
-            stock_price_rub = stock_price_rub * denomination
-            currency_amount = currency_amount * denomination
+        currency_amount = round(stock_price_rub / currency_price_rub * -stock_amount, 9)
 
         date = str(x[13][i]).split()[0]
         next_date = str(x[13][i + 1]).split()[0]
 
-        aci = round(abs(x[23][i] / stock_amount), 9)
+        aci = round(abs(x[30][i] / stock_amount), 9)
 
         repo_cell = str(x[43][i])
 
