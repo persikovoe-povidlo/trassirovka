@@ -5,3 +5,4 @@ __pycache__/
 venv/
 test.py
 *.csv
+last_day_files_downloaded.txt
