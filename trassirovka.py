@@ -5,6 +5,8 @@ from pyexcelerate import Workbook
 from download import download_cur
 import warnings
 from os.path import exists
+from os import remove, getlogin
+import webbrowser
 
 
 def main():
@@ -13,30 +15,21 @@ def main():
     file = 'Сделки_01072022-03082022_03-08-2022_174758.xls'
     eod_prices_file = 'Pozitsii_Po_Tsb_01072022-04082022_04-08-2022_155347.xls'
     leftovers_file = 'Pozitsii_Po_Tsb_30062022-30062022_09-08-2022_103732.xls'
+    last_day_files_downloaded_file = 'last_day_files_downloaded.txt'
     exch_rates_usd_file = 'usd.xlsx'
     exch_rates_cny_file = 'cny.xlsx'
     positions = []
 
     start_time = time.time()
     print('reading files...')
-    if not exists('usd.xlsx'):
-        download_cur('01', '01', '2022', 'usd')
-        print('downloaded usd.xlsx')
-        download_cur('01', '01', '2022', 'cny')
-        print('downloaded cny.xlsx')
 
-    with warnings.catch_warnings(record=True):
-        warnings.simplefilter("always")
-        usd_df = pd.read_excel(exch_rates_usd_file, sheet_name=0, header=0, engine="openpyxl")
+    if not exists(last_day_files_downloaded_file):
+        open(last_day_files_downloaded_file, 'w')
 
-    if usd_df['data'][0].date() < datetime.date.today() - datetime.timedelta(days=1):
-        download_cur('01', '01', '2022', 'usd')
-        print('downloaded usd.xlsx')
-        download_cur('01', '01', '2022', 'cny')
-        print('downloaded cny.xlsx')
+    download_currencies(last_day_files_downloaded_file)
 
     x = pd.concat(
-        [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 11, 12, 13, 20, 23, 25, 29, 30, 43, 44, 55], header=None),
+        [pd.read_excel(file, sheet_name=0, usecols=[3, 8, 13, 20, 25, 29, 30, 43, 44, 55], header=None),
          pd.DataFrame([[]])], ignore_index=True).drop([0])
     x[13] = pd.to_datetime(x[13])
     x = x.sort_values(by=[13, 43], ignore_index=True)
@@ -57,7 +50,7 @@ def main():
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
 
-    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 11, 13, 17, 21, 24, 26, 28, 29],
+    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 13, 17, 21, 24, 26],
                                    header=None)
     leftovers_df = pd.DataFrame()
     for i in range(leftovers_list[0].size):
@@ -130,26 +123,26 @@ def main():
     n = x[8].size - 1
     k = 1
 
-    for i in range(n):
+    x = x.to_dict('records')
+    for i, row in enumerate(x[:-1]):
         if i >= n / 10 * k:
             print('{} % done'.format(k * 10))
             k += 1
-        stock_name = str(x[8][i])
-        stock_amount = x[20][i]
-        currency_price_rub = round(x[55][i], 9)
-        stock_price_rub = x[29][i] / -stock_amount
-        currency_name = str(x[25][i])
+        stock_name = str(row[8])
+        stock_amount = row[20]
+        currency_price_rub = round(row[55], 9)
+        stock_price_rub = row[29] / -stock_amount
+        currency_name = str(row[25])
         currency_amount = round(stock_price_rub / currency_price_rub * -stock_amount, 9)
 
-        date = str(x[13][i]).split()[0]
-        next_date = str(x[13][i + 1]).split()[0]
+        date = str(row[13]).split()[0]
+        next_date = str(x[i + 1][13]).split()[0]
+        aci = round(abs(row[30] / stock_amount), 9)
 
-        aci = round(abs(x[30][i] / stock_amount), 9)
-
-        repo_cell = str(x[43][i])
+        repo_cell = str(row[43])
 
         if repo_cell == 'РЕПО 1 часть':
-            repos[x[3][i]] = currency_amount
+            repos[row[3]] = currency_amount
             realized_stock = None
             realized_cur = None
             stock_fifo_amount = None
@@ -157,7 +150,7 @@ def main():
             stock_fifo = None
             currency_fifo = None
         elif repo_cell == 'РЕПО 2 часть':
-            realized_stock = currency_amount + repos[x[44][i]]
+            realized_stock = currency_amount + repos[row[44]]
             realized_cur = None
             stock_fifo_amount = None
             currency_fifo_amount = None
@@ -211,6 +204,7 @@ def main():
                 [date, currency_name, currency_amount, currency_price_rub, aci, '', *list(' ' * len(positions)),
                  currency_fifo_amount, currency_fifo, realized_cur])
             table.append(['', '', '', '', '', *[positions[e] for e in positions]])
+
     df = pd.DataFrame(table)
 
     print('{} % done'.format(k * 10))
@@ -284,6 +278,25 @@ def save_to_xlsx(df, filename, sheetname='1'):
     wb = Workbook()
     wb.new_sheet(sheetname, data=values)
     wb.save(filename)
+
+
+def download_currencies(last_day_files_downloaded_file):
+    with open(last_day_files_downloaded_file, 'r+') as f:
+        text = f.readline()
+        date = str(datetime.date.today())
+        if text != date:
+            f.seek(0)
+            f.write(str(date))
+            f.truncate()
+            '''webbrowser.open(
+                'http://www.cbr.ru/Queries/UniDbQuery/DownloadExcel/98956?Posted=True&so=1&mode=1&VAL_NM_RQ=R01235&From=01.01.2022&To=01.01.2022&FromDate=01%2F01%2F2022&ToDate=01%2F01%2F2022',
+                new=1)
+            time.sleep(2)
+
+            remove('C:\\Users\\'+getlogin()+'\\Downloads\\RC_F01_01_2022_T01_01_2022.xlsx')'''
+            for cur in ['usd', 'cny']:
+                download_cur('2022-01-01', cur)
+                print(f'downloaded {cur}.xlsx')
 
 
 if __name__ == '__main__':
