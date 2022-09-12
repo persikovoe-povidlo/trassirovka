@@ -50,32 +50,11 @@ def main():
     positions = {e: 0 for e in positions}
     queues = {e: [] for e in positions}
 
-    leftovers_list = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 13, 17, 21, 24, 26],
-                                   header=None)
-    leftovers_df = pd.DataFrame()
-    for i in range(leftovers_list[0].size):
-        date = str(leftovers_list[0][i]).split()[0]
-        stock_name = leftovers_list[8][i]
-        stock_amount = leftovers_list[13][i]
-        if date == needed_date and stock_name in positions.keys() and stock_amount:
-            total_stock_price = leftovers_list[24][i]
-            stock_price = leftovers_list[17][i]
-            stock_price_rub = round(total_stock_price / abs(stock_amount), 9)
-            currency_name = leftovers_list[21][i]
-            aci = round(leftovers_list[26][i] / abs(stock_amount), 9)
-            currency_price_rub = round(total_stock_price / stock_price / stock_amount, 9)
-            new_df = pd.DataFrame(
-                [['', '', '', '', '', '', '', '', stock_name, '', '', '', '', date, '', '', '',
-                  '', '', '', stock_amount, '', '', '', '', currency_name, '', '', '', -total_stock_price, -aci,
-                  '', '', '',
-                  '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
-                  currency_price_rub]])
-            leftovers_df = pd.concat([leftovers_df, new_df])
-            if date not in eod_price_dict:
-                eod_price_dict[date] = {}
-            eod_price_dict[date][stock_name] = stock_price_rub
-            eod_price_dict[date]['РУБ'] = 1
-    x = pd.concat([leftovers_df, x], ignore_index=True)
+    leftovers_dict = pd.read_excel(leftovers_file, sheet_name=0, usecols=[0, 8, 13, 17, 21, 24, 26],
+                                   header=None).to_dict('records')
+
+    if needed_date not in eod_price_dict:
+        eod_price_dict[needed_date] = {}
 
     with warnings.catch_warnings(record=True):
         warnings.simplefilter("always")
@@ -106,6 +85,28 @@ def main():
         date = str(row['data']).split()[0]
         if date in eod_price_dict.keys():
             eod_price_dict[date]['CNY'] = row['curs'] / row['nominal']
+
+    leftovers_list = []
+
+    for row in leftovers_dict:
+        date = str(row[0]).split()[0]
+        stock_name = row[8]
+        stock_amount = row[13]
+        if date == needed_date and stock_name in positions.keys() and stock_amount:
+            total_stock_price = row[24]
+            stock_price_rub = round(total_stock_price / abs(stock_amount), 9)
+            currency_name = row[21]
+            aci = round(row[26] / abs(stock_amount), 9)
+            eod_price_dict[date][stock_name] = stock_price_rub
+            eod_price_dict[date]['РУБ'] = 1
+            currency_price_rub = eod_price_dict[date][currency_name]
+            leftovers_list.append(['', '', '', '', '', '', '', '', stock_name, '', '', '', '', date, '', '', '',
+                                   '', '', '', stock_amount, '', '', '', '', currency_name, '', '', '',
+                                   -total_stock_price, -aci, '', '', '',
+                                   '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '', '',
+                                   currency_price_rub])
+    leftovers_df = pd.DataFrame(leftovers_list)
+    x = pd.concat([leftovers_df, x], ignore_index=True)
 
     eod_price = dict(positions)
     imp_sum = 0
@@ -288,15 +289,18 @@ def download_currencies(last_day_files_downloaded_file):
             f.seek(0)
             f.write(str(date))
             f.truncate()
-            '''webbrowser.open(
-                'http://www.cbr.ru/Queries/UniDbQuery/DownloadExcel/98956?Posted=True&so=1&mode=1&VAL_NM_RQ=R01235&From=01.01.2022&To=01.01.2022&FromDate=01%2F01%2F2022&ToDate=01%2F01%2F2022',
-                new=1)
-            time.sleep(2)
-
-            remove('C:\\Users\\'+getlogin()+'\\Downloads\\RC_F01_01_2022_T01_01_2022.xlsx')'''
             for cur in ['usd', 'cny']:
                 download_cur('2022-01-01', cur)
                 print(f'downloaded {cur}.xlsx')
+
+
+def bypass_site_protection():
+    webbrowser.open(
+        'http://www.cbr.ru/Queries/UniDbQuery/DownloadExcel/98956?Posted=True&so=1&mode=1&VAL_NM_RQ=R01235&From=01.01.2022&To=01.01.2022&FromDate=01%2F01%2F2022&ToDate=01%2F01%2F2022',
+        new=1)
+    time.sleep(2)
+
+    remove('C:\\Users\\' + getlogin() + '\\Downloads\\RC_F01_01_2022_T01_01_2022.xlsx')
 
 
 if __name__ == '__main__':
